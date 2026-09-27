@@ -22,20 +22,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.reevan.reevzdrip.data.CombinationWithGarments
+import com.reevan.reevzdrip.data.describeAudience
+import com.reevan.reevzdrip.util.formatFullDate
 import com.reevan.reevzdrip.ui.common.CombinationCollage
 import com.reevan.reevzdrip.ui.common.GarmentImage
 
 /**
  * One outfit, full size: its collage, what is in it, and — from Phase 7 — where it has been.
  *
- * The wear history is the reason this screen exists at all. Requirement 9 is about tapping an
- * outfit to see when you wore it and who saw it, and that needs plan entries, which arrive in
- * Phase 5. Until then the section is present and says so, rather than being left out and having to
- * be slotted in later.
+ * The wear history is the reason this screen exists at all — requirement 9 is about tapping an
+ * outfit to see when you wore it and who saw it, so you know whether repeating it is safe.
+ *
+ * Only **past** days appear. A day still ahead is an intention, and listing it as history would
+ * claim people have seen something they have not.
  */
 @Composable
 fun CombinationDetailScreen(
     entry: CombinationWithGarments,
+    history: WearHistoryState,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -128,12 +132,34 @@ fun CombinationDetailScreen(
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        Text(
-            text = "Once you start planning days in Plan, every past day this outfit was worn — " +
-                "and which groups saw it — shows up here. Arrives in Phase 7.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 6.dp),
-        )
+
+        when {
+            // One frame at most. Saying "never worn" before the answer is in would be a lie about
+            // the one thing this screen exists to be trusted on.
+            !history.loaded -> Unit
+
+            history.isEmpty -> Text(
+                text = "You haven't worn this yet. Once a day you planned it for has passed, it " +
+                    "shows up here with who saw it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+
+            else -> history.occasions.forEach { occasion ->
+                Column(modifier = Modifier.padding(top = 12.dp)) {
+                    Text(
+                        text = formatFullDate(occasion.entry.day),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = describeAudience(occasion.groupNames),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
     }
 }

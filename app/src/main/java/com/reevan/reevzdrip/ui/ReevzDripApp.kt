@@ -22,7 +22,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import com.reevan.reevzdrip.R
 import com.reevan.reevzdrip.ui.combinations.CombinationsScreen
-import com.reevan.reevzdrip.ui.common.SectionPlaceholder
+import com.reevan.reevzdrip.ui.groups.GroupsScreen
+import com.reevan.reevzdrip.ui.home.HomeScreen
+import com.reevan.reevzdrip.ui.settings.SettingsScreen
+import com.reevan.reevzdrip.ui.plan.PlanScreen
 import com.reevan.reevzdrip.ui.wardrobe.WardrobeScreen
 
 /**
@@ -105,33 +108,17 @@ fun ReevzDripApp() {
     ) { innerPadding ->
         val contentModifier = Modifier.padding(innerPadding)
         when (section) {
-            AppSection.HOME -> SectionPlaceholder(
-                title = "Today's outfits will show here",
-                phase = "Home arrives in Phase 6, once there are plans to read.",
-                modifier = contentModifier,
-            )
+            AppSection.HOME -> HomeScreen(modifier = contentModifier)
 
-            AppSection.PLAN -> SectionPlaceholder(
-                title = "Plan a day",
-                phase = "Plan arrives in Phase 5.",
-                modifier = contentModifier,
-            )
+            AppSection.PLAN -> PlanScreen(modifier = contentModifier)
 
             AppSection.COMBINATIONS -> CombinationsScreen(modifier = contentModifier)
 
             AppSection.WARDROBE -> WardrobeScreen(modifier = contentModifier)
 
-            AppSection.GROUPS -> SectionPlaceholder(
-                title = "Who sees what",
-                phase = "Groups arrive in Phase 4.",
-                modifier = contentModifier,
-            )
+            AppSection.GROUPS -> GroupsScreen(modifier = contentModifier)
 
-            AppSection.SETTINGS -> SectionPlaceholder(
-                title = "Settings",
-                phase = "Theme toggle arrives in Phase 8.",
-                modifier = contentModifier,
-            )
+            AppSection.SETTINGS -> SettingsScreen(modifier = contentModifier)
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.reevan.reevzdrip.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -25,6 +26,15 @@ data class Combination(
     val name: String? = null,
     /** Epoch day the outfit was put together. Orders the list, newest first. */
     val createdOn: Int,
+    /**
+     * Retired from the Combinations list, but still attached to the days it was worn.
+     *
+     * The same rule garments have had since Phase 3 (D9), arriving here now that a plan entry can
+     * make an outfit part of history. An outfit that has been worn is archived rather than
+     * deleted; one that never was is really deleted. Its garments are untouched either way — they
+     * belong to the wardrobe, not to this outfit.
+     */
+    @ColumnInfo(defaultValue = "0") val archived: Boolean = false,
 )
 
 /**
@@ -117,8 +127,10 @@ fun combinationOf(
     id: Long = 0L,
     name: String?,
     createdOn: Int,
+    archived: Boolean = false,
 ): Combination = Combination(
     id = id,
     name = name?.trim()?.ifBlank { null }?.let(::capitalizeWords),
     createdOn = createdOn,
+    archived = archived,
 )

@@ -47,7 +47,7 @@ maximum); **Settings** is an icon in the top bar, because it is the one section 
 a year. Mealz hit the same wall and put its three occasional sections behind a ☰ pause menu; one
 occasional section needs only an icon.
 
-### D7 — Past plan entries are locked 🔜 *Phase 5*
+### D7 — Past plan entries are locked ✅ *built, Phase 5*
 **2026-09-25.** Follows from D4: if history is derived from plan entries, editing a past entry
 rewrites history. Today and the future stay editable; the moment a day passes, its entries become
 read-only and become history. Same rule as Mealz's plan lock at midnight.
@@ -100,7 +100,7 @@ crucially the manifest declares **no `CAMERA` permission** — `ACTION_IMAGE_CAP
 unless the app asks for it, and declaring it would force a runtime prompt for a capability only the
 system camera app ever uses. Do not add it.
 
-### D13 — Warn at planning time when a group has already seen an outfit 🔜 *Phase 5*
+### D13 — Warn at planning time when a group has already seen an outfit ✅ *built, Phase 5*
 **2026-09-25.** Non-blocking: *"Colleagues saw this on 3 Oct"*, with the save still allowed. Not
 literally requested — the requirements ask only for history to look up — but "never repeat an outfit
 in front of them" is the stated goal, and the app already knows the answer at the moment the
@@ -177,6 +177,107 @@ Found on the phone: without it the builder read *"3 selected"* above two ticked 
 archived garment was in the selection but not on screen — the count contradicted the display and
 there was no way to take the garment out. Building a *new* outfit still only ever sees the live
 wardrobe.
+
+
+### D21 — `archived` columns are added with the table, not when first used ✅ *Phase 3 and 4*
+**2026-09-27.** `groups.archived` shipped in the migration that created `groups`, even though
+nothing can set it until plan entries exist in Phase 5. D9 has already decided the rule, so this is
+a scheduled requirement rather than speculation, and riding the table's own migration costs nothing
+where a later addition would need a whole schema bump for one boolean.
+
+Same play as `garments.photoName`, added unused in Phase 1 and picked up by Phase 2 with no
+migration at all. The limit is the one CLAUDE.md draws: a column a *decided* requirement needs, not
+a column something might one day want.
+
+### D22 — Duplicate group names are caught in the UI, not by the index ✅ *built, Phase 4*
+**2026-09-27.** `groups.name` has a unique index, but SQLite compares bytes, so it would happily
+store "Colleagues" beside "COLLEAGUES". `isDuplicateGroupName` does a case-insensitive,
+whitespace-trimmed check as the user types, and the index is the backstop that turns a logic bug
+into a loud failure rather than the first line of defence.
+
+Checked while typing rather than on save because the failure is silent: two groups that look
+identical in every list the app shows are indistinguishable, and you would only find out you picked
+the wrong one after wearing the outfit.
+
+
+### D23 — Today is plannable here, unlike in Reevz Mealz ✅ *built, Phase 5*
+**2026-09-27.** `planLock` has two states, OPEN (today and later) and PASSED. Mealz has three, and
+locks a day the moment it *begins* — because its Today screen owns what actually happened, and
+letting the plan be rewritten afterwards would make its plan-versus-actual comparison meaningless.
+
+Drip has no such split (D4), and requirement 5 is explicit: *"I can also plan for the current
+day."* Porting Mealz's rule unchanged would have quietly broken the day the user most needs to
+edit — the morning you realise the plan is wrong. Worth recording because the Mealz file is the
+obvious thing to copy and copying it would have been wrong.
+
+### D24 — Plan reads the clock once, Home must not ✅ *Phase 5, and a note for Phase 6*
+**2026-09-27.** `PlanViewModel` reads `todayEpochDay()` once at construction. Re-reading it per
+recomposition would make the lock flicker across midnight while a screen is open, and a plan that
+silently becomes uneditable mid-edit is worse than one a few hours stale.
+
+**Home has the opposite requirement** — it must roll over at midnight without a restart — so Phase
+6 needs its own answer rather than reusing this one.
+
+
+### D25 — Home rolls over at midnight; two mechanisms, both needed ✅ *built, Phase 6*
+**2026-09-27.** `HomeViewModel.todayFlow()` emits today's epoch day, sleeps exactly until the next
+local midnight (`millisUntilNextMidnight`), then emits again. This is the **opposite** of
+`PlanViewModel`, which reads the clock once (D24) — and the difference is deliberate, because the
+two screens fail in opposite directions. A plan that changes its lock mid-edit is a bug; a Home
+screen that needs the app killed and reopened at midnight fails the only job it has.
+
+Both mechanisms are required, because midnight passes in two different ways:
+
+- **App left open overnight** — the sleep fires and re-emits. Waiting for the instant costs one
+  wakeup; polling every minute would cost 1,440 to catch the same moment.
+- **Backgrounded and reopened the next day** — `WhileSubscribed` stops the flow shortly after the
+  UI stops collecting and restarts it on return, re-reading the clock. This is also the
+  belt-and-braces half: if Doze defers the sleep while the screen is off, the restart on resume
+  corrects it before anything is shown.
+
+The delay is computed from `startOfDayMillis(today + 1)` rather than by adding 24 hours, so a 23-
+or 25-hour DST day still lands on midnight, and it is clamped to at least 1ms so the loop cannot
+spin.
+
+
+### D26 — History is two queries, not a table ✅ *built, Phase 7*
+**2026-09-27.** Both history views are `SELECT ... WHERE day < :today` over `plan_entries`. No new
+tables, no schema bump — the database stayed at v4 through the whole phase. That is D4 paying off:
+because a past plan entry *is* the wear record, "what have I worn" and "what have they seen" are
+two orderings of data that already exists.
+
+`today` is passed in as a parameter rather than read from SQLite's clock, so the rule is testable
+and the app owns its own definition of now — and so the same query can be re-run at midnight from
+`util/todayFlow` to roll a today-entry into the past while the screen is open.
+
+Neither view filters `archived`. A retired group still has to be named on the day it saw something,
+and a retired outfit still has to appear in the group that saw it — which is the whole reason
+archiving exists instead of deleting (D9).
+
+
+### D27 — One settings row, not a key/value store ✅ *built, Phase 8*
+**2026-09-27.** `app_settings` is a single row at `id = 1` with a typed column per preference.
+A key/value table would trade compile-time field names for runtime string keys and nullable reads,
+in exchange for a flexibility nothing here needs — there is one app with one settings screen.
+New preferences are new columns, each an additive migration Room generates.
+
+The row does not exist until something is changed, and readers substitute the defaults, so a fresh
+install needs no seeding step. Setters re-read the stored row before writing rather than writing
+back the substituted default, which is what stops a future setter clobbering a column it does not
+know about.
+
+`PreferencesViewModel` is shared between `MainActivity` and the Settings screen — `viewModel()`
+resolves to the activity's store — so changing the theme repaints straight away instead of on next
+launch.
+
+### D28 — R8 stays off until there is a release to ship ✅ *decided, Phase 8*
+**2026-09-27.** `optimization { enable = false }` is unchanged. Enabling it means building and
+testing a release variant, verifying keep rules against a minified build for Room and Coil, and
+having a signing config — real work whose only payoff is a build nobody currently runs, since the
+app is installed as a debug APK on one phone.
+
+Revisit when there is a reason to produce a release build, and treat it as its own change with its
+own on-device verification rather than a tick on a polish list.
 
 ---
 

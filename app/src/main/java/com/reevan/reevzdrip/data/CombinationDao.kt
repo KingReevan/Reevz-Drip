@@ -22,7 +22,7 @@ interface CombinationDao {
      * outfit keeps rendering exactly as it was built.
      */
     @Transaction
-    @Query("SELECT * FROM combinations ORDER BY createdOn DESC, id DESC")
+    @Query("SELECT * FROM combinations WHERE archived = 0 ORDER BY createdOn DESC, id DESC")
     fun observeAll(): Flow<List<CombinationWithGarments>>
 
     @Transaction
@@ -41,7 +41,18 @@ interface CombinationDao {
     @Query("DELETE FROM combination_items WHERE combinationId = :combinationId")
     suspend fun clearItems(combinationId: Long)
 
-    /** Deleting the combination cascades to its membership rows. */
+    /**
+     * Retires an outfit that has been worn, instead of deleting it. Its membership rows and its
+     * plan entries stay exactly as they are — that is the history.
+     */
+    @Query("UPDATE combinations SET archived = 1 WHERE id = :id")
+    suspend fun archive(id: Long)
+
+    /**
+     * Really deletes an outfit; its membership rows cascade away with it. Only safe when no plan
+     * entry references it — the `RESTRICT` foreign key on `plan_entries` refuses otherwise, which
+     * is the intended backstop rather than a case to handle.
+     */
     @Delete
     suspend fun deleteCombination(combination: Combination)
 

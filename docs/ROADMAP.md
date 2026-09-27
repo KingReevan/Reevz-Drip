@@ -17,11 +17,11 @@ anything at all.
 | 1 | Wardrobe | Garment CRUD, card grid, no photos | ✅ **done** 2026-09-25 |
 | 2 | Photos | Capture/pick, storage, thumbnails | ✅ **done** 2026-09-25 |
 | 3 | Combinations | Build/view/edit outfits, collage cards | ✅ **done** 2026-09-27 |
-| 4 | Groups | Group CRUD | next |
-| 5 | Plan | Calendar, assign outfits + groups | |
-| 6 | Home | Today, read-only | |
-| 7 | History | Combination detail, group detail | |
-| 8 | Settings & polish | Theme toggle, empty states, a11y pass | |
+| 4 | Groups | Group CRUD | ✅ **done** 2026-09-27 |
+| 5 | Plan | Calendar, assign outfits + groups | ✅ **done** 2026-09-27 |
+| 6 | Home | Today, read-only | ✅ **done** 2026-09-27 |
+| 7 | History | Combination detail, group detail | ✅ **done** 2026-09-27 |
+| 8 | Settings & polish | Theme toggle, empty states, a11y pass | ✅ **done** 2026-09-27 |
 
 All eight open questions were answered on 2026-09-25 and are recorded as D6–D15 in
 `DECISIONS.md`.
@@ -133,67 +133,140 @@ showed *"3 selected"* above two ticked tiles, because the archived garment was i
 not in the picker — so it could not be seen or deselected. The builder now also offers the garments
 an outfit already holds, labelled "Removed".
 
-## Phase 4 — Groups ← next
+## Phase 4 — Groups ✅
 
 The smallest phase. Straight CRUD.
 
-- [ ] `PeopleGroup` entity (unique name), schema bump + `@AutoMigration`
-- [ ] `GroupDao`, `GroupsViewModel`, `GroupsScreen`, editor sheet
-- [ ] Archive rather than delete a group that has seen something (D9)
-- [ ] Detail view — the shell that Phase 7 fills with history
+**Done:** verified on the phone. v2 → v3 migrated a live database with every garment intact and
+`integrity_check` ok; groups created, renamed and deleted; the duplicate check rejected
+"COLLEGE FRIENDS" against an existing "College Friends"; light and dark both checked. Test groups
+were removed afterwards, so the section is empty.
 
-## Phase 5 — Plan
+- [x] `PeopleGroup` entity (unique name), schema **v3** with `@AutoMigration(2, 3)`
+- [x] `GroupDao`, `GroupsViewModel`, `GroupsScreen` (a plain list, not a card grid), editor sheet
+- [x] Case-insensitive duplicate-name check as you type, with the unique index as the backstop
+- [x] Detail view — name, rename/delete, and the history section Phase 7 fills
+- [x] `groups.archived` column added **now**, unused, so Phase 5 needs no schema bump for it (D21)
+- [ ] ~~Archive rather than delete a group that has seen something~~ — **moved to Phase 5.** Nothing
+      can have *seen* anything until plan entries exist, so hard delete is correct today and
+      `GroupDao.archive` is already written for the reroute
+
+## Phase 5 — Plan ✅
 
 The most logic-heavy phase. Most of the bugs in this app will live here.
 
-- [ ] `PlanEntry` + `PlanEntryGroup` entities, schema bump + `@AutoMigration`
-- [ ] **Reroute combination and group deletion to archive-if-worn (D9).** Phase 3 and 4 hard-delete
-      a combination and a group, which is safe only while nothing can have been *worn*. Plan entries
-      end that, exactly as combinations ended it for garments in Phase 3 — so this lands in the same
-      phase, not after.
-- [ ] Calendar day picker — port Mealz's `DayPicker` (week strip / month grid toggle)
-- [ ] **Past days are not plannable.** Pure, tested predicate — the Mealz `PlanLock` pattern
-- [ ] Assign a combination to a day; more than one per day
-- [ ] **Assigning requires at least one group.** Save is blocked until one is chosen
-- [ ] Edit and remove assignments — today and future only
-- [ ] Repeat warning (D13): non-blocking, naming the group and the date it last saw this
+- [x] `PlanEntry` + `PlanEntryGroup` entities, schema **v4** with `@AutoMigration(3, 4)`
+- [x] **Combination and group deletion rerouted to archive-if-worn (D9)** — the debt from Phases 3
+      and 4, paid in the phase that created it. Both dialogs say which of the two will happen
+- [x] Calendar day picker ported from Mealz, converted to epoch days
+- [x] **Past days are not plannable** — but they *are* viewable, since a past day is the record of
+      what you wore. `planLock` is pure and tested, and deliberately differs from Mealz (D23)
+- [x] Assign a combination to a day; more than one per day, with the duplicate greyed out
+- [x] **Assigning requires at least one group** — Save disabled, and refused in the ViewModel too
+- [x] Edit and remove assignments — today and future only
+- [x] Repeat warning (D13): non-blocking, one line per group, correct tense for past vs future
 
 Everything date-shaped goes in a pure function with a unit test. "Is this day still plannable",
 "which days does this month strip cover", "has this group seen this" — all testable without a
 device, and all places where a subtle off-by-one is invisible until it matters.
 
-**Done when** an outfit and its groups can be assigned to a future day, and the past is genuinely
-unreachable.
+**Done:** verified on the phone. v3 → v4 migrated a live database with every garment intact,
+`foreign_key_check` and `integrity_check` clean; the same again on the post-test restore.
 
-## Phase 6 — Home
+Verified end to end: an outfit assigned to today and to tomorrow with a group; a past day showing
+"Yesterday" with **no add button** and past-tense empty text; the repeat warning firing with the
+right tense; the duplicate outfit greyed out as "Already on this day"; archiving a planned outfit
+and a group that had seen one, both leaving every plan row untouched.
+
+**Not verified through the UI:** the *past-tense* branch of the repeat warning. Creating a past
+sighting needs a plan entry on a past day, which the lock correctly makes impossible, and changing
+the device clock needs root. It is covered by unit tests instead — noted rather than glossed.
+
+## Phase 6 — Home ✅
 
 Small, and the whole point.
 
-- [ ] `HomeViewModel` — today's plan entries with their combinations and groups
-- [ ] `HomeScreen` — read-only. Outfits for today, groups who will see each. Nothing else
-- [ ] Empty state for a day with nothing planned
-- [ ] Rolls over at midnight without needing a restart
+- [x] `HomeViewModel` — today's plan entries with their combinations and groups
+- [x] `HomeScreen` — read-only. Outfits for today, groups who will see each. Nothing else: no date
+      header, no edit affordance, no link through to Plan
+- [x] Empty state for a day with nothing planned
+- [x] Rolls over at midnight without needing a restart (D25)
 
-**Done when** opening the app in the morning answers "what am I wearing" with no taps.
+**Done:** verified on the phone. An outfit planned for today appears on Home with its group and
+nothing else; the empty state reads correctly with nothing planned; both themes checked; the screen
+survives a background/resume and a configuration change without crashing.
 
-## Phase 7 — History
+**Not verified on-device: the midnight rollover itself.** Observing it needs either a nine-hour
+wait or setting the device clock, which needs root — and changing the phone's clock to prove a
+point is not a trade worth making on someone's daily driver. What *is* verified: the delay
+computation has five unit tests (lands exactly on midnight from any hour, always positive so the
+loop cannot spin, crosses a month boundary), and the resume path is standard `WhileSubscribed`
+behaviour, exercised by the background/resume test above. Stated here rather than glossed.
+
+## Phase 7 — History ✅
 
 Now that plan entries can be in the past, the payoff.
 
-- [ ] Combination detail — every past day it was worn, and which groups saw it, newest first
-- [ ] Group detail — every outfit that group has seen, with dates
-- [ ] Both read-only, both derived from plan entries (`day < today`), no new tables
-- [ ] Empty states for never-worn outfits and groups that have seen nothing
+- [x] Combination detail — every past day it was worn, and which groups saw it, newest first
+- [x] Group detail — every outfit that group has seen, with dates and a collage
+- [x] Both read-only, both derived from plan entries (`day < today`), **no new tables, no schema
+      bump** — the database stayed at v4
+- [x] Empty states for never-worn outfits and groups that have seen nothing
+- [x] `todayFlow` extracted to `util/Today.kt` and shared with Home, so history rolls a
+      today-entry into the past at midnight without reopening the screen (D25)
+- [x] `describeAudience` — "Colleagues and Gym" rather than a comma-separated dump
 
-**Done when** tapping an outfit answers "who has already seen this".
+**Done:** verified on the phone with injected fixture data — a plan entry in the **past** cannot be
+created through the UI, because the Phase 5 lock correctly forbids it, so the rows were written
+straight into the database instead. That exercises the read paths, which is all this phase adds;
+the write paths were verified in Phase 5.
 
-## Phase 8 — Settings & polish
+With entries seeded at today−10, today−3, **today** and **today+5**:
 
-- [ ] `AppSettings` single-row entity + theme toggle (System / Light / Dark), Mealz pattern
-- [ ] Empty states everywhere, checked with a genuinely empty database
-- [ ] Accessibility pass — 48dp targets, content descriptions on garment photos
-- [ ] Light/dark check on every screen, photos included
-- [ ] Consider R8 (`optimization { enable = true }`) before any real release
+- "Office Friday" listed exactly the two past days, newest first, and the two-group day read
+  "Colleagues and Gym".
+- The **today** entry and the **future** entry were correctly absent from both views — the
+  `day < today` rule doing its job.
+- The Colleagues group listed the same two days with collages.
+- A never-worn outfit showed its empty state.
+
+**Not verified on-device: the "group has seen nothing" empty state.** The phone was picked up and
+in use partway through, so driving it further would have been fighting the user for the screen. It
+is the same `when (!loaded / isEmpty / else)` shape as the outfit empty state, which *was* seen
+working. Noted rather than glossed.
+
+## Phase 8 — Settings & polish ✅
+
+- [x] `AppSettings` single-row entity + theme toggle (System / Light / Dark), schema **v5** with
+      `@AutoMigration(4, 5)`. Shared `PreferencesViewModel` between `MainActivity` and Settings, so
+      a change repaints immediately rather than on next launch
+- [x] Empty states everywhere — every one has now been seen rendering on the phone, including the
+      "this group has seen nothing" state that Phase 7 left unverified
+- [x] Accessibility pass — **one real fix**: the calendar day cell was a 42dp touch target, under
+      the 48dp minimum. `minimumInteractiveComponentSize()` reserves the full 48dp for the tap
+      without growing the circle. Every other tappable thing is either a Material 3 component
+      (which handles its own minimum) or a grid cell far above it
+- [x] Light/dark checked on every screen across the phases, photos included
+- [x] Dead code removed — `SectionPlaceholder` had no callers left once every section was built
+- [ ] **R8 left off, deliberately.** See below.
+
+**Done:** verified on the phone. v4 → v5 migrated a live database with every garment intact and
+`integrity_check` clean, twice counting the post-test restore. The theme toggle was exercised both
+ways against an opposing system setting — **app dark while the phone was light, then app light
+while the phone was dark** — repainting immediately and surviving a cold restart.
+
+### On R8
+
+The roadmap said "consider R8 before any real release", and the considered answer is **not yet**.
+Turning `optimization { enable = true }` on means building and testing a *release* variant: Room
+and Coil both do reflective work that needs keep rules verified against a minified build, and a
+signing config has to exist. That is a real piece of work.
+
+There is currently no release — the app is installed as a debug APK on one phone, and the user
+never sees a minified build. Flipping the switch today would buy nothing and risk a class of bug
+that only appears in the variant nobody runs. **Do it when there is a reason to ship a release
+build, and treat it as its own change with its own on-device verification** — not as a tick on a
+polish list.
 
 ---
 

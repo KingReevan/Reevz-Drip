@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -66,6 +67,7 @@ fun CombinationsScreen(
     viewModel: CombinationsViewModel = viewModel(factory = CombinationsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val history by viewModel.history.collectAsStateWithLifecycle()
 
     var mode by rememberSaveable { mutableStateOf(Mode.LIST) }
     var activeId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -76,6 +78,13 @@ fun CombinationsScreen(
     val active = activeId?.let { id -> state.combinations.firstOrNull { it.combination.id == id } }
     val pendingDelete =
         pendingDeleteId?.let { id -> state.combinations.firstOrNull { it.combination.id == id } }
+
+    // Tell the ViewModel which outfit's history to load. Driven by an effect rather than by each
+    // call site so every route into and out of the detail — tap, back, delete, edit — stays in
+    // step without four places having to remember.
+    LaunchedEffect(mode, activeId) {
+        viewModel.openDetail(activeId.takeIf { mode == Mode.DETAIL })
+    }
 
     // An outfit deleted from its own detail screen leaves nothing to detail.
     if (mode == Mode.DETAIL && state.loaded && active == null) {
@@ -126,6 +135,7 @@ fun CombinationsScreen(
         Mode.DETAIL -> active?.let { entry ->
             CombinationDetailScreen(
                 entry = entry,
+                history = history,
                 onEdit = { mode = Mode.BUILDER },
                 onDelete = { pendingDeleteId = entry.combination.id },
                 modifier = modifier,
@@ -187,21 +197,29 @@ fun CombinationsScreen(
         }
     }
 
-    // Deleting an outfit does not touch the garments in it — they belong to the wardrobe.
+    // Deleting an outfit does not touch the garments in it — they belong to the wardrobe. What it
+    // does to the outfit itself depends on whether it has ever been planned (D9).
     pendingDelete?.let { entry ->
+        val plannedCount = state.planUsage[entry.combination.id] ?: 0
         AlertDialog(
             onDismissRequest = { pendingDeleteId = null },
             title = { Text("Delete ${entry.combination.name ?: "this outfit"}?") },
             text = {
                 Text(
-                    "The clothes in it stay in your Wardrobe. Only the grouping is removed, and " +
-                        "it cannot be undone.",
+                    if (plannedCount > 0) {
+                        val days = if (plannedCount == 1) "1 day" else "$plannedCount days"
+                        "The clothes in it stay in your Wardrobe. It stays on the $days it is " +
+                            "planned for, so your history of what you wore does not change."
+                    } else {
+                        "The clothes in it stay in your Wardrobe. Only the grouping is removed, " +
+                            "and it cannot be undone."
+                    },
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.delete(entry.combination)
+                        viewModel.delete(entry.combination, plannedCount)
                         pendingDeleteId = null
                         activeId = null
                         mode = Mode.LIST

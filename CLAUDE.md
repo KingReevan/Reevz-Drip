@@ -13,8 +13,9 @@ repeating an outfit in front of the same group.
 It is a personal app — not a multi-user SaaS product, not something that ships to a store with
 accounts and a backend. Treat that as a design constraint, not a temporary phase.
 
-> **Status: Phases 0–3 are built and verified on the phone.** Phase 4 (groups) is next.
-> Do not start it, or any later phase, until the user names it.
+> **Status: all nine phases (0–8) are built and verified on the phone.** Every flow in
+> `docs/REQUIREMENTS.md` works end to end. There is no "next phase" — further work is whatever the
+> user asks for next, and the same rules apply: name the change, explain it, verify it.
 
 ## Read this first
 
@@ -186,10 +187,8 @@ is one:
 Single Gradle module `:app`, package `com.reevan.reevzdrip`. Room persists locally, fully offline.
 Target device is a **Nothing Phone (2a)**; `minSdk 24` / `targetSdk 37` covers it.
 
-**Built (Phases 0–3):** the app shell, the Wardrobe, garment photos, and Combinations. Five bottom
-tabs — Home, Plan, Outfits, Wardrobe, Groups — plus Settings behind a top-bar icon. Three of the six
-sections are still placeholders naming the phase that will build them; **Wardrobe and Combinations
-are real** and have full CRUD.
+**Built: all of it.** Five bottom tabs — Home, Plan, Outfits, Wardrobe, Groups — plus Settings
+behind a top-bar icon. No placeholders remain.
 
 **Wardrobe** shows every garment as a two-column card grid — photo slot, name, type — newest first,
 filterable by type with a chip row whose active chip toggles off. Adding and editing happen in a
@@ -200,6 +199,35 @@ the order the user described. Delete asks first, by name.
 the builder is a full-screen 3-column wardrobe grid you tap to select from, with an optional name;
 the detail view shows the collage large, the contents by type, and the wear-history section Phase 7
 fills in. Collage order is **derived from garment type**, not stored — see D19.
+
+**Groups** are named sets of people — the ones who will see an outfit. A plain list rather than a
+card grid: a group is a word, not something to look at. Names are unique, checked
+case-insensitively as you type (D22). The detail view holds the "what they've seen" history that
+Phase 7 fills in.
+
+**Plan** is a day picker (week strip or month grid, days with something planned carry a dot) over
+the chosen day's assignments. Assigning opens a full screen where you pick one outfit and one or
+more groups — both are required, and Save stays disabled until both are there. A day can hold
+several outfits, but not the same one twice: the duplicate is greyed out as "Already on this day".
+Choosing an outfit and groups fires the **repeat warning** (D13) — non-blocking, one line per
+group, in the right tense for a past sighting versus a future clash.
+
+**Today and every later day are editable; past days are read-only** (D7, D23). Past days stay
+*visible*, because a past day is the record of what you wore.
+
+**Settings** holds the theme toggle (System / Light / Dark), stored in a single-row `app_settings`
+table (D27). `PreferencesViewModel` is shared with `MainActivity`, so a change repaints
+immediately. New settings belong here as another panel.
+
+**History** is two read-only queries, not a table (D26). An outfit's detail lists every **past**
+day it was worn and who saw it; a group's detail lists every past outfit they have seen, with
+dates. Both are `day < today` over `plan_entries` — which is D4 paying off, since a past plan entry
+already *is* the wear record. Neither filters `archived`: a retired group must still be named on the
+day it saw something.
+
+**Home** is today's outfits and who will see each, read-only, and **nothing else** — no date
+header, no edit affordance, no link through to Plan. The requirement is unusually specific about
+what is absent, so resist adding to it. It rolls over at midnight without a restart (D25).
 
 **Photos** come from the system Photo Picker or the camera. They are re-encoded on import to a
 1080px long edge with EXIF rotation baked into the pixels, stored as `filesDir/garments/<uuid>.jpg`
@@ -214,9 +242,15 @@ app/src/main/java/com/reevan/reevzdrip/
 │   ├── GarmentDao.kt            observeAll(Flow) w/ outfit counts, archive, insert/update/delete
 │   ├── Combination.kt           @Entity + CombinationItem + relation POJO + orderedForCollage()
 │   ├── CombinationDao.kt        @Relation/@Junction reads, transactional create/replace
+│   ├── PeopleGroup.kt           @Entity + peopleGroupOf() + isDuplicateGroupName()
+│   ├── PlanEntry.kt             @Entity + PlanEntryGroup + details POJO + Sighting
+│   ├── PlanDao.kt               day/usage/sighting queries, transactional assign + reassign
+│   ├── GroupDao.kt              observeAll(Flow), archive, insert/update/delete
 │   ├── PhotoSizing.kt           pure: sample size, scaling, EXIF orientation (tested)
 │   ├── PhotoStore.kt            import / delete / camera target — all the Android-side IO
-│   └── DripDatabase.kt          @Database v2, singleton, exportSchema, foreign_keys=ON
+│   ├── AppSettings.kt           single-row @Entity + ThemeMode enum
+│   ├── AppSettingsDao.kt        observe / get / upsert
+│   └── DripDatabase.kt          @Database v5, singleton, exportSchema, foreign_keys=ON
 ├── ui/
 │   ├── AppSection.kt            the six sections — this is the navigation model
 │   ├── ReevzDripApp.kt          shell: top bar, nav bar, section dispatch, back handling
@@ -225,11 +259,29 @@ app/src/main/java/com/reevan/reevzdrip/
 │   │   ├── CombinationsViewModel.kt   outfits + the wardrobe the builder picks from
 │   │   ├── CombinationCard.kt         collage card
 │   │   ├── CombinationBuilderScreen.kt  full-screen picker
-│   │   └── CombinationDetailScreen.kt   collage, contents, history placeholder
+│   │   └── CombinationDetailScreen.kt   collage, contents, wear history
 │   ├── common/
 │   │   ├── CombinationCollage.kt  the collage layouts + collagePlan()
 │   │   ├── GarmentImage.kt        the ONE place a garment photo is drawn
-│   │   └── SectionPlaceholder.kt  SectionPlaceholder + EmptyState
+│   │   └── EmptyState.kt          the "nothing here yet" state
+│   ├── home/
+│   │   ├── HomeScreen.kt          today's outfits, read-only
+│   │   └── HomeViewModel.kt       HomeUiState + the midnight-rollover flow
+│   ├── groups/
+│   │   ├── GroupsScreen.kt        list + detail dispatch, own BackHandler
+│   │   ├── GroupsViewModel.kt     GroupsUiState + save/delete
+│   │   ├── GroupEditorSheet.kt    one-field sheet, live duplicate check
+│   │   └── GroupDetailScreen.kt   name, rename/delete, what they've seen
+│   ├── settings/
+│   │   ├── SettingsScreen.kt      panels; today just the theme
+│   │   └── PreferencesViewModel.kt  shared with MainActivity
+│   ├── plan/
+│   │   ├── PlanScreen.kt          picker + the day's assignments, own BackHandler
+│   │   ├── PlanViewModel.kt       PlanUiState + assign/remove/warningsFor
+│   │   ├── DayPicker.kt           week strip / month grid, ported from Mealz
+│   │   ├── AssignOutfitScreen.kt  pick one outfit + groups, repeat warning
+│   │   ├── PlanLock.kt            pure: which days may be written to (differs from Mealz)
+│   │   └── RepeatWarning.kt       pure: "they've seen this before"
 │   ├── theme/                   Color / Theme / Type — quiet neutral, no dynamic colour
 │   └── wardrobe/
 │       ├── WardrobeScreen.kt    card grid, type filter, FAB, delete dialog
@@ -237,12 +289,18 @@ app/src/main/java/com/reevan/reevzdrip/
 │       ├── GarmentCard.kt       the card
 │       └── GarmentEditorSheet.kt  add/edit sheet, incl. picker + camera launchers
 └── util/
-    ├── Dates.kt                 epoch-day ↔ millis conversion
+    ├── Dates.kt                 epoch-day ↔ millis conversion, calendar helpers
+    ├── Today.kt                 todayFlow() — re-emits at midnight (Home + both histories)
     └── TextCase.kt              capitalizeWords, ported from Mealz
 ```
 
-**Not built:** groups, plan entries, history, settings. `docs/DATA_MODEL.md` has the schema they
-will need.
+**The schema is complete** for the requirements as written: `garments`, `combinations` +
+`combination_items`, `groups`, `plan_entries` + `plan_entry_groups`, `app_settings`. Database at
+v5, five exported schemas in `app/schemas/`, every migration an `@AutoMigration` exercised against
+live data on the phone.
+
+**R8 is still off** (`optimization { enable = false }`), deliberately — see D28. Turn it on when
+there is a reason to ship a release build, as its own change with its own verification.
 
 ### Deleting things: the rule, and the debt it carries
 
@@ -252,12 +310,26 @@ and still renders inside its outfits. A garment nothing references is really del
 `GarmentDao.observeAll` carries each garment's outfit count so the delete dialog can say which one
 is about to happen. There is deliberately **no un-archive** — archiving is what delete *means* here.
 
-### Gotcha carried into Phase 5
+### The delete rule is now complete
 
-`CombinationsViewModel.delete()` **hard-deletes** an outfit, and Phase 4's group delete will do the
-same. That is correct only while nothing can have been *worn*. Phase 5 introduces plan entries and
-ends it — exactly the trap Phase 1 set for Phase 3. Reroute both to archive-if-worn **in the same
-phase that adds plan entries**, not after. It is on the Phase 5 checklist.
+Every deletable thing follows D9: **archived if it has history, really deleted if it has none.**
+Garments archive when an outfit uses them, outfits when a day is planned around them, groups when
+they are attached to a planned outfit. Each delete dialog says which of the two is about to happen,
+and each `observeAll` hides archived rows while every history query still shows them. There is no
+un-archive anywhere, by design.
+
+Nothing is left hard-deleting something that could have history. If a future phase adds another
+entity that can be referenced, apply the same rule **in the phase that makes the reference
+possible** — that is the trap Phase 1 set for Phase 3, and Phases 3 and 4 set for Phase 5.
+
+### The clock is read two different ways, on purpose
+
+`PlanViewModel` reads it **once** at construction, so its lock cannot flicker across midnight
+mid-edit (D24). `HomeViewModel` **re-emits at midnight**, because today's outfits must appear when
+the day arrives (D25). Neither is the "right" pattern to copy blindly — pick by asking whether the
+screen would rather be a few hours stale or change under the user's hands.
+
+`util/Today.kt` holds the shared rolling flow; Home and both history views use it, Plan does not.
 
 ## Toolchain notes (non-obvious — read before touching Gradle)
 

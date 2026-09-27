@@ -81,3 +81,118 @@ fun formatShortDate(epochDay: Int): String =
 /** Full date for a history entry, e.g. "Tue 26 Aug 2026". */
 fun formatFullDate(epochDay: Int): String =
     SimpleDateFormat("EEE d MMM yyyy", Locale.getDefault()).format(Date(startOfDayMillis(epochDay)))
+
+// --- Calendar helpers, all in epoch days ------------------------------------------------
+//
+// Ported from Reevz Mealz's `util/Dates.kt`, converted from millis to epoch days. The conversion
+// is worth it: `addDays` becomes exact integer arithmetic instead of a Calendar round-trip that
+// has to renormalise to midnight afterwards so a DST transition cannot leave it an hour short.
+// Everything that genuinely needs a calendar — month lengths, where a week starts — still goes
+// through [Calendar], because that is what it is good at.
+
+private const val DAYS_IN_WEEK = 7
+
+private fun calendarAt(epochDay: Int): Calendar =
+    Calendar.getInstance().apply { timeInMillis = startOfDayMillis(epochDay) }
+
+/** [days] later than [epochDay]. Exact: an epoch day is a count of days, so this is addition. */
+fun addDays(epochDay: Int, days: Int): Int = epochDay + days
+
+/** The first day of the month containing [epochDay]. */
+fun startOfMonth(epochDay: Int): Int {
+    val calendar = calendarAt(epochDay)
+    calendar.set(Calendar.DAY_OF_MONTH, 1)
+    return epochDayOf(calendar.timeInMillis)
+}
+
+/**
+ * The first day of the month [months] away from the one containing [epochDay].
+ *
+ * Anchored to the first of the month before adding, so stepping forward from the 31st cannot land
+ * on a month that has no 31st and silently skip one.
+ */
+fun addMonths(epochDay: Int, months: Int): Int {
+    val calendar = calendarAt(startOfMonth(epochDay))
+    calendar.add(Calendar.MONTH, months)
+    return epochDayOf(calendar.timeInMillis)
+}
+
+/** The seven days of the week containing [epochDay], from the locale's first day of the week. */
+fun weekDaysOf(epochDay: Int): List<Int> {
+    val calendar = calendarAt(epochDay)
+    val firstDayOfWeek = calendar.firstDayOfWeek
+    while (calendar.get(Calendar.DAY_OF_WEEK) != firstDayOfWeek) {
+        calendar.add(Calendar.DAY_OF_MONTH, -1)
+    }
+    val weekStart = epochDayOf(calendar.timeInMillis)
+    return (0 until DAYS_IN_WEEK).map { weekStart + it }
+}
+
+/**
+ * The month containing [epochDay] as calendar cells: leading and trailing nulls pad the grid so
+ * every row holds exactly seven entries and real days sit under the right weekday column.
+ */
+fun monthGridOf(epochDay: Int): List<Int?> {
+    val monthStart = startOfMonth(epochDay)
+    val calendar = calendarAt(monthStart)
+    val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val leadingBlanks =
+        ((calendar.get(Calendar.DAY_OF_WEEK) - calendar.firstDayOfWeek) + DAYS_IN_WEEK) %
+            DAYS_IN_WEEK
+
+    val cells = ArrayList<Int?>(leadingBlanks + daysInMonth)
+    repeat(leadingBlanks) { cells.add(null) }
+    for (offset in 0 until daysInMonth) {
+        cells.add(monthStart + offset)
+    }
+    while (cells.size % DAYS_IN_WEEK != 0) {
+        cells.add(null)
+    }
+    return cells
+}
+
+/** Weekday column headings, ordered from the locale's first day of the week. */
+fun weekdayHeadings(now: Long = System.currentTimeMillis()): List<String> =
+    weekDaysOf(todayEpochDay(now)).map { formatWeekdayShort(it).take(1) }
+
+/** Always-qualified month heading for the picker, e.g. "September 2026". */
+fun formatMonthAndYear(epochDay: Int): String =
+    SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date(startOfDayMillis(epochDay)))
+
+/** Abbreviated weekday, e.g. "Tue". */
+fun formatWeekdayShort(epochDay: Int): String =
+    SimpleDateFormat("EEE", Locale.getDefault()).format(Date(startOfDayMillis(epochDay)))
+
+/** Day of the month as a bare number, e.g. "26". */
+fun formatDayOfMonth(epochDay: Int): String =
+    SimpleDateFormat("d", Locale.getDefault()).format(Date(startOfDayMillis(epochDay)))
+
+/**
+ * A date the way you would say it out loud: "Today", "Tomorrow", "Yesterday", or the full date.
+ *
+ * The three near days carry their meaning without arithmetic — "Tomorrow" is the whole point of
+ * this app, and making the user work out that Mon 28 Sept is tomorrow defeats it.
+ */
+fun formatRelativeDay(epochDay: Int, today: Int): String = when (epochDay - today) {
+    0 -> "Today"
+    1 -> "Tomorrow"
+    -1 -> "Yesterday"
+    else -> formatFullDate(epochDay)
+}
+
+/**
+ * Milliseconds from [now] until the next local midnight.
+ *
+ * Home has to roll over to the new day while it is open — the requirement is that today's outfits
+ * appear "when that day arrives", and an app you have to kill and reopen at midnight does not do
+ * that. A screen that waits exactly this long and then re-reads the date is precise and costs
+ * nothing, where polling every minute would burn wakeups all day to catch one instant.
+ *
+ * Never returns zero or less: a non-positive delay would spin. Clock changes and DST are handled
+ * by asking [startOfDayMillis] for the next calendar day rather than adding 24 hours, so a 23- or
+ * 25-hour day still lands on midnight.
+ */
+fun millisUntilNextMidnight(now: Long = System.currentTimeMillis()): Long {
+    val nextMidnight = startOfDayMillis(epochDayOf(now) + 1)
+    return (nextMidnight - now).coerceAtLeast(1L)
+}

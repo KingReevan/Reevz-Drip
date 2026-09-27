@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import com.reevan.reevzdrip.data.ThemeMode
 
 private val LightScheme = lightColorScheme(
     primary = SlateInk,
@@ -75,16 +76,30 @@ private val DarkScheme = darkColorScheme(
  * UI has, which is making a garment easy to recognise. There is no `dynamicColor` flag, so this
  * cannot be half-enabled by accident.
  *
- * [darkTheme] follows the system for now. Settings (Phase 8) will pass an explicit choice.
+ * [themeMode] is the user's stored choice; `SYSTEM` defers to the phone, which is the default and
+ * what every install had before Settings existed.
  */
 @Composable
 fun ReevzDripTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkScheme else LightScheme,
+        colorScheme = if (themeMode.isDark()) DarkScheme else LightScheme,
         typography = Typography,
         content = content,
     )
+}
+
+/**
+ * Resolves a [ThemeMode] against the system setting.
+ *
+ * Exposed so anything that needs to know which way the app is currently painted asks the same
+ * question the theme does, rather than re-deriving it and drifting.
+ */
+@Composable
+fun ThemeMode.isDark(): Boolean = when (this) {
+    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    ThemeMode.LIGHT -> false
+    ThemeMode.DARK -> true
 }
