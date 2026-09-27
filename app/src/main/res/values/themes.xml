@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      The window background shown before Compose draws its first frame. Kept in sync with the
+      theme ground colour in ui/theme/Color.kt (StoneGround / CharcoalGround) so launching in
+      dark mode does not flash white.
+    -->
+    <style name="Theme.ReevzDrip" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>

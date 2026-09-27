@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!--
+      Only the camera scratch directory is shared, and only so the camera app can write its
+      capture into it. Garment photos in filesDir are never exposed: nothing outside this app has
+      any business reading the user's wardrobe.
+    -->
+    <cache-path
+        name="camera"
+        path="camera/" />
+</paths>
