@@ -304,6 +304,29 @@ here than it looks: the target Nothing Phone (2a) has themed icons **on**, so th
 layer is the one actually on the home screen — the SlateInk background is only seen with
 themed icons off. Sibling app Reevz Mealz separates the layer the same way.
 
+### D30 — "All" is a chip, not a hidden toggle ✅ *built, 2026-10-02*
+**2026-10-02.** The Wardrobe type filter originally had four chips and no "All". Clearing it meant
+tapping the active chip a second time, and the old comment in `WardrobeScreen.kt` presented that as
+a saving: no separate "All" to maintain.
+
+Reported by the user: *"after I click on a filter, I am not able to go back to that 'all' view."*
+The toggle was working — verified on the phone, two taps on the same chip did clear it. The
+gesture was simply invisible. Two things made it worse together:
+
+- Nothing on screen suggests a selected chip is tappable *again*, and the thing it would do has no
+  name anywhere in the UI.
+- The palette is deliberately quiet (D-less, but see `ui/theme/Color.kt`), so a selected
+  `FilterChip` differs from an unselected one by a few points of container luminance. On the dark
+  theme the active chip is genuinely hard to pick out, so even "re-tap the selected one" is not
+  answerable by looking.
+
+A chip costs one line. The rule worth keeping: **the way back to the default state gets a visible
+control, not a gesture** — doubly so when the design language is low-contrast by choice, because
+a quiet palette spends its contrast budget on photographs and has none left over to signal state.
+
+Re-selecting the active chip still clears the filter, since a chip that looks like a toggle should
+behave like one. `setFilter(null)` already handled the "All" case, so the ViewModel was unchanged.
+
 ---
 
 ## Open — needs the user

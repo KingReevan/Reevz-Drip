@@ -83,7 +83,13 @@ class WardrobeViewModel(
             initialValue = WardrobeUiState(),
         )
 
-    /** Tapping the active chip clears the filter, which is what a toggle should do. */
+    /**
+     * Narrows the grid to one garment type, or to everything when [type] is null.
+     *
+     * Re-selecting the active type also clears it, which is what a chip that looks like a toggle
+     * should do. That is no longer the only way back to the whole wardrobe, though — the row has
+     * an explicit "All", because a gesture nobody can see is not an affordance.
+     */
     fun setFilter(type: GarmentType?) {
         filter.value = if (filter.value == type) null else type
     }

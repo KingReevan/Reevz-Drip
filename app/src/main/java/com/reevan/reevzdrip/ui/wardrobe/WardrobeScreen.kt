@@ -197,11 +197,20 @@ fun WardrobeScreen(
     }
 }
 
-/** Type filter. Tapping the active chip clears it, so there is no separate "All" to maintain. */
+/**
+ * Type filter, with "All" as a chip of its own.
+ *
+ * Tapping the active chip also clears it, and for a while that was the *only* way back to the
+ * whole wardrobe — which is a gesture you have to already know about, because nothing on screen
+ * suggests it. Worse, this palette is deliberately quiet (see `ui/theme/Color.kt`), so a selected
+ * chip barely reads as selected and "which one do I un-tap?" is not answerable by looking. An
+ * unfiltered wardrobe is the state you start in and the one you keep coming back to; it earns a
+ * chip rather than a hidden gesture.
+ */
 @Composable
 private fun TypeFilterRow(
     selected: GarmentType?,
-    onSelect: (GarmentType) -> Unit,
+    onSelect: (GarmentType?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -211,6 +220,11 @@ private fun TypeFilterRow(
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        FilterChip(
+            selected = selected == null,
+            onClick = { onSelect(null) },
+            label = { Text("All") },
+        )
         GarmentType.entries.forEach { type ->
             FilterChip(
                 selected = selected == type,

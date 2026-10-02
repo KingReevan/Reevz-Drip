@@ -191,7 +191,9 @@ Target device is a **Nothing Phone (2a)**; `minSdk 24` / `targetSdk 37` covers i
 behind a top-bar icon. No placeholders remain.
 
 **Wardrobe** shows every garment as a two-column card grid — photo slot, name, type — newest first,
-filterable by type with a chip row whose active chip toggles off. Adding and editing happen in a
+filterable by type with an **All / Top / Pant / Shoes / Accessory** chip row. The active chip also
+toggles off, but "All" is a visible chip rather than only that gesture — see D30. Adding and
+editing happen in a
 bottom sheet: a name (required), an optional photo, and a TOP / PANT / SHOES / ACCESSORY chip —
 the order the user described. Delete asks first, by name.
 
