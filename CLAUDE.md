@@ -234,6 +234,13 @@ what is absent, so resist adding to it. It rolls over at midnight without a rest
 with only the filename on the row. The import runs **on save, not on pick**, so abandoning the
 editor cannot orphan a file.
 
+**The launcher icon** is a t-shirt, off-white on SlateInk — the app's own two colours. It is
+*generated*: `tools/icon/generate_launcher_icon.py` owns the outline and emits both the three
+vector layers and the ten legacy `mipmap-*dpi` bitmaps that `minSdk 24` still needs, so the two
+representations cannot drift. Change the shape there and re-run it; hand-editing the path leaves
+the bitmaps stale (D29). The phone has themed icons on, so the `<monochrome>` layer is the one
+actually on the home screen.
+
 ```
 app/src/main/java/com/reevan/reevzdrip/
 ├── MainActivity.kt              single ComponentActivity, hosts ReevzDripApp

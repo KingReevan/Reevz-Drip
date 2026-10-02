@@ -279,6 +279,31 @@ app is installed as a debug APK on one phone.
 Revisit when there is a reason to produce a release build, and treat it as its own change with its
 own on-device verification rather than a tick on a polish list.
 
+### D29 — The launcher icon is generated, not drawn ✅ *built, 2026-10-02*
+**2026-10-02.** A t-shirt, off-white on SlateInk. Both colours come straight from
+`ui/theme/Color.kt`, so the icon is made of the app's own palette rather than a third scheme
+nobody chose.
+
+The awkward part is that one icon needs **thirteen files**. Adaptive icons are three vector
+layers, but `minSdk 24` predates them, so API 24–25 also fall back to ten flat
+`mipmap-*dpi` bitmaps. Drawing the tee twice — once as path data, once in an image editor —
+is two representations that drift apart the first time anyone nudges a sleeve.
+
+So `tools/icon/generate_launcher_icon.py` owns the outline, and emits both: the
+`pathData` for the vectors and the rasterised bitmaps, from the same sampled curve. Re-running
+it reproduces the committed `.webp` files byte for byte, which is the point — that is what
+makes it the source rather than a thing that once produced them. **Editing the path by hand
+leaves the ten bitmaps showing the old tee**, and nothing in the build will say so.
+
+It also pins the shape inside the safe zone mechanically. A launcher may mask an adaptive icon
+to any shape inside the central 72dp circle; the script reports the furthest point from centre
+(27.1 of 36) instead of leaving that to the eye.
+
+The `<monochrome>` layer is its own drawable, not the foreground re-used. That matters more
+here than it looks: the target Nothing Phone (2a) has themed icons **on**, so the monochrome
+layer is the one actually on the home screen — the SlateInk background is only seen with
+themed icons off. Sibling app Reevz Mealz separates the layer the same way.
+
 ---
 
 ## Open — needs the user
